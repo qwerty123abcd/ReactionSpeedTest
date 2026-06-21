@@ -1,4 +1,19 @@
-// DOM Elements
+// --- FIREBASE CONFIGURATION ---
+const firebaseConfig = {
+    apiKey: "AIzaSyDYBWWlh7amFBKtO0PY3-UGHg-bPltGqMk",
+    authDomain: "reaction-test-1e5ad.firebaseapp.com",
+    databaseURL: "https://reaction-test-1e5ad-default-rtdb.asia-southeast1.firebasedatabase.app", 
+    projectId: "reaction-test-1e5ad",
+    storageBucket: "reaction-test-1e5ad.firebasestorage.app",
+    messagingSenderId: "643790878744",
+    appId: "1:643790878744:web:2ace746d5e2ca81e5feb6d"
+};
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
+// --- DOM ELEMENTS ---
 const authModal = document.getElementById('auth-modal');
 const mainLayout = document.getElementById('main-layout');
 const authForm = document.getElementById('auth-form');
@@ -14,18 +29,30 @@ const averageTimeDisplay = document.getElementById('average-time');
 const leaderboardList = document.getElementById('leaderboard-list');
 const clearBtn = document.getElementById('clear-btn');
 
-// Game State Variables
+// --- GAME STATE VARIABLES ---
 let state = 'idle'; 
 let startTime = 0;
 let timeoutId = null;
 let currentUser = null;
 
-// Global Databases from LocalStorage
-let usersDatabase = JSON.parse(localStorage.getItem('usersDatabase')) || {};
-let globalLeaderboard = JSON.parse(localStorage.getItem('globalLeaderboard')) || [];
+// Local tracking profile (Saves personal history on your local browser machine)
+let localHistory = JSON.parse(localStorage.getItem('localReactionProfile')) || { allTimes: [], bestTime: Number.MAX_SAFE_INTEGER };
+
+// --- LIVE GLOBAL LEADERBOARD SYNC ---
+// Listens to your database in the cloud. When anyone registers a record,
+// the UI instantly sorts ascendingly and updates globally!
+database.ref('scores').orderByChild('score').limitToFirst(5).on('value', (snapshot) => {
+    leaderboardList.innerHTML = '';
+    
+    snapshot.forEach((childSnapshot) => {
+        const entry = childSnapshot.val();
+        const li = document.createElement('li');
+        li.innerHTML = `<strong>${entry.name}</strong>: ${entry.score} ms`;
+        leaderboardList.appendChild(li);
+    });
+});
 
 // --- AUTHENTICATION FLOW ---
-
 authForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const username = usernameInput.value.trim();
@@ -33,42 +60,24 @@ authForm.addEventListener('submit', (e) => {
 
     currentUser = username;
     
-    // Check if user already exists in local DB, if not, initialize them
-    if (!usersDatabase[currentUser]) {
-        usersDatabase[currentUser] = {
-            allTimes: [],
-            bestTime: Number.MAX_SAFE_INTEGER
-        };
-        saveDatabase();
-    }
-
-    // Switch screens
+    // Toggle application screens
     authModal.classList.add('hidden');
     mainLayout.classList.remove('hidden');
     
-    // Update dashboard profile
     userDisplay.textContent = currentUser;
     updateUserStatsUI();
-    updateLeaderboardUI();
 });
 
 logoutBtn.addEventListener('click', () => {
     currentUser = null;
     usernameInput.value = '';
     
-    // Reset display numbers
     currentTimeDisplay.textContent = '0';
-    bestTimeDisplay.textContent = '0';
-    averageTimeDisplay.textContent = '0';
-
-    // Toggle screen visibility back to sign-in modal
     mainLayout.classList.add('hidden');
     authModal.classList.remove('hidden');
 });
 
-
-// --- GAME LOGIC ---
-
+// --- CORE GAME ACTIONS ---
 testZone.addEventListener('mousedown', () => {
     if (state === 'idle') {
         startTest();
@@ -111,74 +120,14 @@ function endTest() {
     
     currentTimeDisplay.textContent = reactionTime;
     
-    // Save performance directly to current profile
-    const userProfile = usersDatabase[currentUser];
-    userProfile.allTimes.push(reactionTime);
-    
-    if (reactionTime < userProfile.bestTime) {
-        userProfile.bestTime = reactionTime;
+    // Append to running statistics
+    localHistory.allTimes.push(reactionTime);
+    if (reactionTime < localHistory.bestTime) {
+        localHistory.bestTime = reactionTime;
     }
+    localStorage.setItem('localReactionProfile', JSON.stringify(localHistory));
     
-    saveDatabase();
     updateUserStatsUI();
-    handleGlobalLeaderboard(currentUser, reactionTime);
-}
-
-// --- DATA PROCESSING & UI CONTROLS ---
-
-function updateUserStatsUI() {
-    const profile = usersDatabase[currentUser];
     
-    // Update Personal Best
-    if (profile.bestTime === Number.MAX_SAFE_INTEGER) {
-        bestTimeDisplay.textContent = '0';
-    } else {
-        bestTimeDisplay.textContent = profile.bestTime;
-    }
-
-    // Update Personal Average
-    if (profile.allTimes.length > 0) {
-        const sum = profile.allTimes.reduce((total, t) => total + t, 0);
-        averageTimeDisplay.textContent = Math.round(sum / profile.allTimes.length);
-    } else {
-        averageTimeDisplay.textContent = '0';
-    }
-}
-
-function handleGlobalLeaderboard(username, score) {
-    // Add entry into leaderboard array containing username tag
-    globalLeaderboard.push({ name: username, score: score });
-    
-    // Sort scores ascendingly (lower ms means higher ranking)
-    globalLeaderboard.sort((a, b) => a.score - b.score);
-    
-    // Chop down array to strictly keep top 5 global scores
-    globalLeaderboard = globalLeaderboard.slice(0, 5);
-    
-    localStorage.setItem('globalLeaderboard', JSON.stringify(globalLeaderboard));
-    updateLeaderboardUI();
-}
-
-function updateLeaderboardUI() {
-    leaderboardList.innerHTML = '';
-    
-    globalLeaderboard.forEach((entry) => {
-        const li = document.createElement('li');
-        li.innerHTML = `<strong>${entry.name}</strong>: ${entry.score} ms`;
-        leaderboardList.appendChild(li);
-    });
-}
-
-function saveDatabase() {
-    localStorage.setItem('usersDatabase', JSON.stringify(usersDatabase));
-}
-
-// System reset button
-clearBtn.addEventListener('click', () => {
-    if(confirm("Are you sure you want to completely erase all user accounts and leaderboards?")) {
-        localStorage.clear();
-        usersDatabase = {};
-        globalLeaderboard = [];
-        logoutBtn.click(); // boot user out to sign-in modal
-    }
-});
+    // Stream data instantly into your Firebase Realtime database cluster
+    sendScoreToGlobalLeaderboard(currentUser, reactionTime
