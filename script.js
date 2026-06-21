@@ -9,9 +9,14 @@ const firebaseConfig = {
     appId: "1:643790878744:web:2ace746d5e2ca81e5feb6d"
 };
 
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
-const database = firebase.database();
+// Initialize Firebase safely
+let database;
+try {
+    firebase.initializeApp(firebaseConfig);
+    database = firebase.database();
+} catch (error) {
+    console.error("Firebase initialization failed:", error);
+}
 
 // --- DOM ELEMENTS ---
 const authModal = document.getElementById('auth-modal');
@@ -39,31 +44,45 @@ let currentUser = null;
 let localHistory = JSON.parse(localStorage.getItem('localReactionProfile')) || { allTimes: [], bestTime: Number.MAX_SAFE_INTEGER };
 
 // --- LIVE GLOBAL LEADERBOARD SYNC ---
-// Listens to your database in the cloud. When anyone registers a record,
-// the UI instantly sorts ascendingly and updates globally!
-database.ref('scores').orderByChild('score').limitToFirst(5).on('value', (snapshot) => {
-    leaderboardList.innerHTML = '';
-    
-    snapshot.forEach((childSnapshot) => {
-        const entry = childSnapshot.val();
-        const li = document.createElement('li');
-        li.innerHTML = `<strong>${entry.name}</strong>: ${entry.score} ms`;
-        leaderboardList.appendChild(li);
-    });
-});
+if (database) {
+    database.ref('scores').orderByChild('score').limitToFirst(5).on('value', (snapshot) => {
+        leaderboardList.innerHTML = '';
+        
+        // If no scores exist yet in the database
+        if (!snapshot.exists()) {
+            const li = document.createElement('li');
+            li.style.listStyle = 'none';
+            li.style.color = '#a0a0a5';
+            li.textContent = 'No high scores yet. Be the first!';
+            leaderboardList.appendChild(li);
+            return;
+        }
 
-// --- AUTHENTICATION FLOW ---
+        snapshot.forEach((childSnapshot) => {
+            const entry = childSnapshot.val();
+            const li = document.createElement('li');
+            li.innerHTML = `<strong>${entry.name}</strong>: ${entry.score} ms`;
+            leaderboardList.appendChild(li);
+        });
+    }, (error) => {
+        console.error("Leaderboard read failed (Check Firebase Rules):", error);
+    });
+}
+
+// --- AUTHENTICATION FLOW (FIXED) ---
 authForm.addEventListener('submit', (e) => {
     e.preventDefault();
+    
     const username = usernameInput.value.trim();
     if (!username) return;
 
     currentUser = username;
     
-    // Toggle application screens
+    // UI Screen Switching
     authModal.classList.add('hidden');
     mainLayout.classList.remove('hidden');
     
+    // Populate user panel information
     userDisplay.textContent = currentUser;
     updateUserStatsUI();
 });
@@ -129,5 +148,43 @@ function endTest() {
     
     updateUserStatsUI();
     
-    // Stream data instantly into your Firebase Realtime database cluster
-    sendScoreToGlobalLeaderboard(currentUser, reactionTime
+    // Stream data instantly into Firebase Realtime database
+    sendScoreToGlobalLeaderboard(currentUser, reactionTime);
+}
+
+// --- DATA PROCESSING & UI RENDERS ---
+function updateUserStatsUI() {
+    if (localHistory.bestTime === Number.MAX_SAFE_INTEGER) {
+        bestTimeDisplay.textContent = '0';
+    } else {
+        bestTimeDisplay.textContent = localHistory.bestTime;
+    }
+
+    if (localHistory.allTimes.length > 0) {
+        const sum = localHistory.allTimes.reduce((total, t) => total + t, 0);
+        averageTimeDisplay.textContent = Math.round(sum / localHistory.allTimes.length);
+    } else {
+        averageTimeDisplay.textContent = '0';
+    }
+}
+
+function sendScoreToGlobalLeaderboard(username, finalScore) {
+    if (!database) return;
+    
+    database.ref('scores').push({
+        name: username,
+        score: finalScore,
+        timestamp: Date.now()
+    }).catch((error) => {
+        console.error("Score submission failed (Check Firebase Rules):", error);
+    });
+}
+
+// Local Reset button
+clearBtn.addEventListener('click', () => {
+    if(confirm("Reset your local history metrics? (This does not delete historical database node submissions).")) {
+        localStorage.clear();
+        localHistory = { allTimes: [], bestTime: Number.MAX_SAFE_INTEGER };
+        logoutBtn.click();
+    }
+});
