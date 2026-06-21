@@ -69,7 +69,7 @@ if (database) {
     });
 }
 
-// --- AUTHENTICATION FLOW (FIXED) ---
+// --- AUTHENTICATION FLOW ---
 authForm.addEventListener('submit', (e) => {
     e.preventDefault();
     
@@ -182,7 +182,7 @@ function sendScoreToGlobalLeaderboard(username, finalScore) {
 
 // Local Reset button
 clearBtn.addEventListener('click', () => {
-    if(confirm("Reset your local history metrics? (This does not delete historical database node submissions).")) {
+    if (confirm("Reset your local history metrics? (This does not delete historical database node submissions).")) {
         localStorage.clear();
         localHistory = { allTimes: [], bestTime: Number.MAX_SAFE_INTEGER };
         logoutBtn.click();
