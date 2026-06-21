@@ -32,7 +32,6 @@ const currentTimeDisplay = document.getElementById('current-time');
 const bestTimeDisplay = document.getElementById('best-time');
 const averageTimeDisplay = document.getElementById('average-time');
 const leaderboardList = document.getElementById('leaderboard-list');
-const clearBtn = document.getElementById('clear-btn');
 
 // --- GAME STATE VARIABLES ---
 let state = 'idle'; 
@@ -179,12 +178,3 @@ function sendScoreToGlobalLeaderboard(username, finalScore) {
         console.error("Score submission failed (Check Firebase Rules):", error);
     });
 }
-
-// Local Reset button
-clearBtn.addEventListener('click', () => {
-    if (confirm("Reset your local history metrics? (This does not delete historical database node submissions).")) {
-        localStorage.clear();
-        localHistory = { allTimes: [], bestTime: Number.MAX_SAFE_INTEGER };
-        logoutBtn.click();
-    }
-});
