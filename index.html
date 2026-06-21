@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reaction Speed Test</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="auth-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>Welcome to Reaction Test</h2>
+            <p>Please enter a username to track your scores.</p>
+            <form id="auth-form">
+                <input type="text" id="username-input" placeholder="Enter username..." required maxlength="15">
+                <button type="submit" id="login-btn">Let's Play</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="app-layout hidden" id="main-layout">
+        
+        <div class="container">
+            <header class="user-profile">
+                <span>Welcome, <strong id="user-display">Player</strong>!</span>
+                <button id="logout-btn">Log Out</button>
+            </header>
+
+            <h1>Reaction Speed Test</h1>
+            <p class="instructions">Click the box below. When it turns <strong>GREEN</strong>, click as fast as you can!</p>
+            
+            <div id="test-zone" class="idle">
+                <span id="test-text">Click to Start</span>
+            </div>
+
+            <div class="stats">
+                <p>Current: <span id="current-time">0</span> ms</p>
+                <p>Best: <span id="best-time">0</span> ms</p>
+                <p>Average: <span id="average-time">0</span> ms</p>
+            </div>
+        </div>
+
+        <div class="leaderboard-container">
+            <h2>Leaderboard (Top 5)</h2>
+            <ol id="leaderboard-list">
+                </ol>
+            <button id="clear-btn">Clear All Data</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
